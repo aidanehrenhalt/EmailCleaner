@@ -68,6 +68,22 @@ def write_csv(groups: dict[str, SenderGroup], path: str, sort_by: str = "count")
     console.print(f"\n[green]Saved {len(sorted_groups)} sender groups to[/green] {output}")
 
 
+def write_label_csv(messages: list[dict], path: str, label_name: str):
+    """Write labeled messages to a CSV file."""
+    output = Path(path)
+    with output.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["label", "from", "subject", "date"])
+        for msg in messages:
+            writer.writerow([
+                label_name,
+                msg.get("from_header", ""),
+                msg.get("subject", ""),
+                msg.get("date", ""),
+            ])
+    console.print(f"\n[green]Saved {len(messages)} labeled emails to[/green] {output}")
+
+
 def prompt_selection(groups: dict[str, SenderGroup]) -> list[SenderGroup]:
     """Prompt the user to select sender groups by index.
 

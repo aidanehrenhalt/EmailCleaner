@@ -2,6 +2,7 @@
 
 import argparse
 import sys
+from datetime import datetime
 
 from rich.console import Console
 
@@ -19,6 +20,7 @@ from emailcleaner.grouping import group_by_domain, is_transactional
 from emailcleaner.display import (
     show_summary,
     write_csv,
+    write_label_csv,
     prompt_selection,
     confirm_action,
     make_progress,
@@ -99,7 +101,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         default=None,
         metavar="FILE",
-        help="Write results to a CSV file instead of displaying interactively (e.g. results.csv)",
+        help="CSV output filename (default: junk_senders.csv or labeled_emails.csv)",
+    )
+    parser.add_argument(
+        "--new-file",
+        action="store_true",
+        help="Write to a new timestamped CSV instead of overwriting the default file",
     )
     parser.add_argument(
         "--whoami",
@@ -107,6 +114,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print the email address associated with the current token and exit",
     )
     return parser
+
+
+def _resolve_output(output_arg: str | None, new_file: bool, default: str) -> str:
+    """Return the CSV path to write to.
+
+    - Custom name via --output wins if provided.
+    - --new-file inserts a timestamp before the .csv extension.
+    - Otherwise the default filename is used (overwriting if it exists).
+    """
+    base = output_arg or default
+    if new_file:
+        stem, _, ext = base.rpartition(".")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return f"{stem}_{ts}.{ext}" if stem else f"{base}_{ts}"
+    return base
 
 
 def main(argv: list[str] | None = None):
@@ -177,23 +199,26 @@ def main(argv: list[str] | None = None):
             )
             sys.exit(1)
 
-        label_ids = [
-            msg["id"] for msg in messages
+        label_messages = [
+            msg for msg in messages
             if args.include_receipts or not is_transactional(msg.get("subject", ""))
         ]
 
+        csv_path = _resolve_output(args.output, args.new_file, "labeled_emails.csv")
+
         if args.dry_run:
             console.print(
-                f"\n[dim]Dry run — would label {len(label_ids)} emails "
-                f"→ '{args.label}'[/dim]"
+                f"\n[dim]Dry run — would label {len(label_messages)} emails "
+                f"→ '{args.label}' and save to {csv_path}[/dim]"
             )
             sys.exit(0)
 
         with make_progress() as progress:
-            task = progress.add_task("Applying label...", total=len(label_ids))
-            processed = batch_apply_label(service, label_ids, label_id)
+            task = progress.add_task("Applying label...", total=len(label_messages))
+            processed = batch_apply_label(service, [m["id"] for m in label_messages], label_id)
             progress.update(task, completed=processed)
 
+        write_label_csv(label_messages, csv_path, args.label)
         console.print(
             f"\n[bold green]Done! {processed} emails labeled "
             f"→ '{args.label}'[/bold green]"
@@ -207,16 +232,16 @@ def main(argv: list[str] | None = None):
         exclude_receipts=not args.include_receipts,
     )
 
-    if args.output:
-        write_csv(groups, args.output, sort_by=args.sort)
-        if args.dry_run:
-            sys.exit(0)
-    else:
-        show_summary(groups, sort_by=args.sort)
+    csv_path = _resolve_output(args.output, args.new_file, "junk_senders.csv")
+    write_csv(groups, csv_path, sort_by=args.sort)
 
     if args.dry_run:
         console.print("\n[dim]Dry run — no changes made.[/dim]")
         sys.exit(0)
+
+    # Show terminal table for interactive domain selection
+    if not args.domains:
+        show_summary(groups, sort_by=args.sort)
 
     if not groups:
         sys.exit(0)
