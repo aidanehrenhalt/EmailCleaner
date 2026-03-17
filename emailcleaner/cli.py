@@ -84,7 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--include-receipts",
         action="store_true",
-        help="Include receipt/order confirmation emails in sender counts (excluded by default)",
+        help="Include transactional emails (receipts, purchases, shipping, payments) in sender counts (excluded by default)",
     )
     parser.add_argument(
         "--output",

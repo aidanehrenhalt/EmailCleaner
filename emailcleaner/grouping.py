@@ -6,18 +6,40 @@ import re
 
 import tldextract
 
-_RECEIPT_PATTERN = re.compile(
-    r"\b(receipt|invoice|order\s*(confirmation|#|number)|your\s+order|"
-    r"payment\s+confirmation|purchase\s+confirmation|shipping\s+confirmation|"
-    r"booking\s+confirmation|reservation\s+confirmation|your\s+purchase|"
-    r"dispatch(ed)?|has\s+shipped|tracking\s+(number|info))\b",
+_TRANSACTIONAL_PATTERN = re.compile(
+    r"\b("
+    # Receipts & invoices
+    r"receipt|invoice|"
+    # Orders
+    r"order\s*(confirmation|#|no\.?|number|update|status|detail|summary)|"
+    r"your\s+order|new\s+order|order\s+placed|order\s+received|"
+    # Purchases
+    r"purchase\s+(confirmation|summary|detail|receipt)|your\s+purchase|"
+    r"thank(s|\s+you)\s+for\s+(your\s+)?(purchase|order|buying)|"
+    r"you\s+(just\s+)?bought|"
+    # Shipping & delivery
+    r"shipping\s+(confirmation|update|notification|label)|"
+    r"shipment\s+(confirmation|update|notification)|"
+    r"your\s+(shipment|package|parcel|delivery)|"
+    r"(has|is)\s+shipped|(has|is)\s+on\s+(its|the)\s+way|"
+    r"out\s+for\s+delivery|delivery\s+(update|confirmed|attempted|scheduled)|"
+    r"dispatch(ed)?|tracking\s+(number|info|update)|estimated\s+delivery|"
+    r"arrived|package\s+delivered|"
+    # Payments
+    r"payment\s+(confirmation|received|processed|successful|failed|declined|reminder)|"
+    r"transaction\s+(confirmation|receipt|summary)|"
+    r"charge\s+(confirmation|receipt)|"
+    r"refund\s+(issued|processed|confirmation)|"
+    r"subscription\s+(charged|renewed|renewal|billing)|"
+    r"auto(-|\s*)renew(al)?|billing\s+(statement|summary|confirmation)"
+    r")\b",
     re.IGNORECASE,
 )
 
 
-def is_receipt(subject: str) -> bool:
-    """Return True if the subject looks like a transactional receipt."""
-    return bool(_RECEIPT_PATTERN.search(subject))
+def is_transactional(subject: str) -> bool:
+    """Return True if the subject looks like a transactional email (receipt, shipping, payment)."""
+    return bool(_TRANSACTIONAL_PATTERN.search(subject))
 
 
 @dataclasses.dataclass
@@ -70,7 +92,7 @@ def group_by_domain(
     groups: dict[str, SenderGroup] = {}
 
     for msg in messages:
-        if exclude_receipts and is_receipt(msg.get("subject", "")):
+        if exclude_receipts and is_transactional(msg.get("subject", "")):
             continue
 
         addr = extract_email_address(msg["from_header"])
