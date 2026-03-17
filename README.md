@@ -56,17 +56,21 @@ EmailCleaner has two independent modes. **They cannot run simultaneously in one 
 Scan your inbox and interactively select sender domains to trash:
 
 ```bash
-# Preview — no changes made
+# Preview — writes junk_senders.csv, no emails modified
 emailcleaner --dry-run --query "category:promotions" --limit 0
 
-# Trash emails from selected domains
+# Trash emails from selected domains (always writes junk_senders.csv)
 emailcleaner --query "category:promotions"
 
 # Trash specific domains non-interactively
 emailcleaner --domains "mailchimp.com,substack.com"
 
-# Save sender report to CSV instead of interactive mode
-emailcleaner --dry-run --query "category:promotions" --output junk_senders.csv
+# Write to a custom filename instead of the default
+emailcleaner --dry-run --query "category:promotions" --output my_report.csv
+
+# Keep a new timestamped file each run instead of overwriting
+emailcleaner --dry-run --query "category:promotions" --new-file
+# → writes junk_senders_20260317_143022.csv
 ```
 
 ### Label filtering only
@@ -74,13 +78,18 @@ emailcleaner --dry-run --query "category:promotions" --output junk_senders.csv
 Apply a Gmail label to all emails matching a query. The label must already exist in your Gmail account:
 
 ```bash
-# Preview — no changes made
+# Preview — shows count and output path, no changes made
 emailcleaner --label "Internship / Job Hunting" \
   --query "internship OR hiring OR job application" --dry-run
 
-# Apply the label
+# Apply the label (always writes labeled_emails.csv)
 emailcleaner --label "Internship / Job Hunting" \
   --query "internship OR hiring OR job application"
+
+# Keep a new timestamped file each run
+emailcleaner --label "Internship / Job Hunting" \
+  --query "internship OR hiring OR job application" --new-file
+# → writes labeled_emails_20260317_143022.csv
 ```
 
 If the label name isn't found, the tool prints all available label names so you can check the exact spelling.
@@ -158,7 +167,8 @@ Each `--token-dir` holds an independent token, so you can switch between account
 | `--limit` | `0` (unlimited) | Max messages to scan |
 | `--domains` | *(interactive)* | Comma-separated domains to clean (junk mode) |
 | `--include-receipts` | off | Include transactional emails in counts/labeling |
-| `--output` | off | Write junk sender results to a CSV file (junk mode) |
+| `--output` | `junk_senders.csv` / `labeled_emails.csv` | Override the default CSV output filename |
+| `--new-file` | off | Write to a new timestamped CSV instead of overwriting |
 
 ---
 
