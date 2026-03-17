@@ -82,6 +82,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated domains to clean (non-interactive mode)",
     )
     parser.add_argument(
+        "--include-receipts",
+        action="store_true",
+        help="Include receipt/order confirmation emails in sender counts (excluded by default)",
+    )
+    parser.add_argument(
         "--output",
         default=None,
         metavar="FILE",
@@ -141,7 +146,11 @@ def main(argv: list[str] | None = None):
         )
 
     # --- Group by domain ---
-    groups = group_by_domain(messages, min_count=args.min_count)
+    groups = group_by_domain(
+        messages,
+        min_count=args.min_count,
+        exclude_receipts=not args.include_receipts,
+    )
 
     if args.output:
         write_csv(groups, args.output, sort_by=args.sort)

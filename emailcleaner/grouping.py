@@ -2,8 +2,22 @@
 
 import dataclasses
 import email.utils
+import re
 
 import tldextract
+
+_RECEIPT_PATTERN = re.compile(
+    r"\b(receipt|invoice|order\s*(confirmation|#|number)|your\s+order|"
+    r"payment\s+confirmation|purchase\s+confirmation|shipping\s+confirmation|"
+    r"booking\s+confirmation|reservation\s+confirmation|your\s+purchase|"
+    r"dispatch(ed)?|has\s+shipped|tracking\s+(number|info))\b",
+    re.IGNORECASE,
+)
+
+
+def is_receipt(subject: str) -> bool:
+    """Return True if the subject looks like a transactional receipt."""
+    return bool(_RECEIPT_PATTERN.search(subject))
 
 
 @dataclasses.dataclass
@@ -42,7 +56,7 @@ def normalize_domain(email_addr: str) -> str:
 
 
 def group_by_domain(
-    messages: list[dict], min_count: int = 1
+    messages: list[dict], min_count: int = 1, exclude_receipts: bool = True
 ) -> dict[str, SenderGroup]:
     """Group messages by normalized sender domain.
 
@@ -56,6 +70,9 @@ def group_by_domain(
     groups: dict[str, SenderGroup] = {}
 
     for msg in messages:
+        if exclude_receipts and is_receipt(msg.get("subject", "")):
+            continue
+
         addr = extract_email_address(msg["from_header"])
         if not addr:
             continue
