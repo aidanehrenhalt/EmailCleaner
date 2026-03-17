@@ -10,10 +10,12 @@ from emailcleaner.auth import get_gmail_service
 from emailcleaner.gmail import (
     list_message_ids,
     get_message_headers,
+    list_labels,
+    batch_apply_label,
     batch_trash,
     batch_delete,
 )
-from emailcleaner.grouping import group_by_domain
+from emailcleaner.grouping import group_by_domain, is_transactional
 from emailcleaner.display import (
     show_summary,
     write_csv,
@@ -82,6 +84,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated domains to clean (non-interactive mode)",
     )
     parser.add_argument(
+        "--label",
+        default=None,
+        metavar="LABEL_NAME",
+        help='Apply a Gmail label to all matched emails (e.g. "Internship / Job Hunting"). '
+             "Skips interactive sender selection.",
+    )
+    parser.add_argument(
         "--include-receipts",
         action="store_true",
         help="Include transactional emails (receipts, purchases, shipping, payments) in sender counts (excluded by default)",
@@ -144,6 +153,41 @@ def main(argv: list[str] | None = None):
         messages = get_message_headers(
             service, message_ids, on_batch_done=on_batch
         )
+
+    # --- Label mode: apply a label to all matched emails and exit ---
+    if args.label:
+        labels = list_labels(service)
+        label_id = labels.get(args.label)
+        if not label_id:
+            console.print(f"[red]Label '{args.label}' not found.[/red]")
+            console.print(
+                "Available labels: "
+                + ", ".join(sorted(labels.keys()))
+            )
+            sys.exit(1)
+
+        label_ids = [
+            msg["id"] for msg in messages
+            if args.include_receipts or not is_transactional(msg.get("subject", ""))
+        ]
+
+        if args.dry_run:
+            console.print(
+                f"\n[dim]Dry run — would label {len(label_ids)} emails "
+                f"→ '{args.label}'[/dim]"
+            )
+            sys.exit(0)
+
+        with make_progress() as progress:
+            task = progress.add_task("Applying label...", total=len(label_ids))
+            processed = batch_apply_label(service, label_ids, label_id)
+            progress.update(task, completed=processed)
+
+        console.print(
+            f"\n[bold green]Done! {processed} emails labeled "
+            f"→ '{args.label}'[/bold green]"
+        )
+        sys.exit(0)
 
     # --- Group by domain ---
     groups = group_by_domain(
