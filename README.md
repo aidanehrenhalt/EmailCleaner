@@ -38,31 +38,64 @@ On the first run, a browser window will open asking you to sign in with Google a
 
 ---
 
+## Modes
+
+EmailCleaner has two independent modes. **They cannot run simultaneously in one command** — run them as separate commands if you need both.
+
+| Mode | Trigger | What it does |
+|------|---------|--------------|
+| **Junk sender** | no `--label` flag (default) | Groups inbox by sender domain, lets you select and trash/delete |
+| **Label filtering** | `--label "Name"` | Applies a Gmail label to all emails matching your query |
+
+---
+
 ## Usage
 
-### Dry run — scan only, no changes
+### Junk sender filtering only
+
+Scan your inbox and interactively select sender domains to trash:
 
 ```bash
-emailcleaner --dry-run
-```
+# Preview — no changes made
+emailcleaner --dry-run --query "category:promotions" --limit 0
 
-### Scan a specific category
+# Trash emails from selected domains
+emailcleaner --query "category:promotions"
 
-```bash
-emailcleaner --dry-run --query "category:promotions"
-emailcleaner --dry-run --query "category:promotions OR category:updates"
-```
-
-### Scan all mail (no limit)
-
-```bash
-emailcleaner --dry-run --limit 0
-```
-
-### Trash emails from specific domains (non-interactive)
-
-```bash
+# Trash specific domains non-interactively
 emailcleaner --domains "mailchimp.com,substack.com"
+
+# Save sender report to CSV instead of interactive mode
+emailcleaner --dry-run --query "category:promotions" --output junk_senders.csv
+```
+
+### Label filtering only
+
+Apply a Gmail label to all emails matching a query. The label must already exist in your Gmail account:
+
+```bash
+# Preview — no changes made
+emailcleaner --label "Internship / Job Hunting" \
+  --query "internship OR hiring OR job application" --dry-run
+
+# Apply the label
+emailcleaner --label "Internship / Job Hunting" \
+  --query "internship OR hiring OR job application"
+```
+
+If the label name isn't found, the tool prints all available label names so you can check the exact spelling.
+
+### Running both modes
+
+The two modes are mutually exclusive per run. To apply both, run them as two separate commands:
+
+```bash
+# Step 1 — label job-related emails
+emailcleaner --label "Internship / Job Hunting" \
+  --query "internship OR hiring OR job application"
+
+# Step 2 — clean up junk senders
+emailcleaner --query "category:promotions"
 ```
 
 ### Permanently delete instead of trash
@@ -71,39 +104,41 @@ emailcleaner --domains "mailchimp.com,substack.com"
 emailcleaner --delete --domains "mailchimp.com"
 ```
 
-> **Note:** `--delete` requires confirming a second prompt and uses a broader OAuth scope (`mail.google.com`). Prefer `--trash` (the default) unless you are certain.
-
-### Apply a label to matched emails
-
-Label all emails matching a query in one shot — no interactive sender selection needed. The label must already exist in your Gmail account.
-
-```bash
-emailcleaner --label "Internship / Job Hunting" --query "internship OR hiring OR job application"
-```
-
-Use `--dry-run` to preview the count before applying:
-
-```bash
-emailcleaner --label "Internship / Job Hunting" --query "internship OR hiring" --dry-run
-```
-
-If the label name isn't found, the tool prints all available label names so you can check the exact spelling.
+> **Note:** `--delete` requires confirming a second prompt and uses a broader OAuth scope (`mail.google.com`). Prefer trash (the default) unless you are certain.
 
 ---
 
 ## Multiple accounts
 
-EmailCleaner stores its auth token in `~/.emailcleaner/` by default. To use a different Gmail account, point `--token-dir` at a separate directory:
+EmailCleaner stores its auth token in `~/.emailcleaner/` by default. Each account gets its own token directory — one directory per account.
+
+### Add a second account
 
 ```bash
-# Personal account (default)
+# Personal account (default token dir)
 emailcleaner --dry-run
 
 # Second account — triggers its own OAuth flow on first use
 emailcleaner --token-dir ~/.emailcleaner/work/ --dry-run
 ```
 
-Each directory holds an independent token, so you can switch between accounts without re-authenticating.
+### Check which account a token belongs to
+
+```bash
+# Default account
+emailcleaner --whoami
+
+# Named token directory
+emailcleaner --token-dir ~/.emailcleaner/work/ --whoami
+```
+
+Output:
+```
+Signed in as: you@gmail.com
+Token dir:    ~/.emailcleaner/work/
+```
+
+Each `--token-dir` holds an independent token, so you can switch between accounts by changing the flag — no re-authentication needed unless the token expires.
 
 ---
 
@@ -113,16 +148,17 @@ Each directory holds an independent token, so you can switch between accounts wi
 |------|---------|-------------|
 | `--credentials` | `credentials.json` | Path to OAuth2 client secrets JSON |
 | `--token-dir` | `~/.emailcleaner/` | Directory to store the auth token |
+| `--whoami` | off | Print the email address for the current token and exit |
 | `-q / --query` | *(all mail)* | Gmail search query |
-| `--label` | off | Apply a named Gmail label to all matched emails |
+| `--label` | off | Apply a named Gmail label to all matched emails (label mode) |
 | `--dry-run` | off | Scan and display only, no modifications |
-| `--delete` | off | Permanently delete instead of trashing |
-| `--min-count` | `2` | Only show senders with at least N emails |
-| `--sort` | `count` | Sort summary by `count` or `domain` |
+| `--delete` | off | Permanently delete instead of trashing (junk mode) |
+| `--min-count` | `2` | Only show senders with at least N emails (junk mode) |
+| `--sort` | `count` | Sort summary by `count` or `domain` (junk mode) |
 | `--limit` | `0` (unlimited) | Max messages to scan |
-| `--domains` | *(interactive)* | Comma-separated domains to clean |
-| `--include-receipts` | off | Include transactional emails in sender counts |
-| `--output` | off | Write results to a CSV file |
+| `--domains` | *(interactive)* | Comma-separated domains to clean (junk mode) |
+| `--include-receipts` | off | Include transactional emails in counts/labeling |
+| `--output` | off | Write junk sender results to a CSV file (junk mode) |
 
 ---
 

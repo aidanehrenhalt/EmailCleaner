@@ -101,6 +101,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         help="Write results to a CSV file instead of displaying interactively (e.g. results.csv)",
     )
+    parser.add_argument(
+        "--whoami",
+        action="store_true",
+        help="Print the email address associated with the current token and exit",
+    )
     return parser
 
 
@@ -123,6 +128,12 @@ def main(argv: list[str] | None = None):
         sys.exit(1)
 
     console.print("[green]Authenticated.[/green]\n")
+
+    if args.whoami:
+        profile = service.users().getProfile(userId="me").execute()
+        console.print(f"Signed in as: [bold cyan]{profile['emailAddress']}[/bold cyan]")
+        console.print(f"Token dir:    {args.token_dir or '~/.emailcleaner/'}")
+        sys.exit(0)
 
     # --- Scan messages ---
     query_display = args.query or "(all mail)"
