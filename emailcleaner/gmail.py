@@ -158,6 +158,35 @@ def batch_trash(service, message_ids: list[str]) -> int:
     return trashed
 
 
+def list_labels(service) -> dict[str, str]:
+    """Return a mapping of {label_name: label_id} for all labels in the mailbox."""
+    result = _retry_on_rate_limit(
+        lambda: service.users().labels().list(userId="me").execute()
+    )
+    return {label["name"]: label["id"] for label in result.get("labels", [])}
+
+
+def batch_apply_label(service, message_ids: list[str], label_id: str) -> int:
+    """Apply a label to messages using batchModify (up to 1000 per call).
+
+    Returns the number of messages labeled.
+    """
+    labeled = 0
+    for i in range(0, len(message_ids), 1000):
+        chunk = message_ids[i : i + 1000]
+        _retry_on_rate_limit(
+            lambda: service.users()
+            .messages()
+            .batchModify(
+                userId="me",
+                body={"ids": chunk, "addLabelIds": [label_id]},
+            )
+            .execute()
+        )
+        labeled += len(chunk)
+    return labeled
+
+
 def batch_delete(service, message_ids: list[str]) -> int:
     """Permanently delete messages using batchDelete (up to 1000 per call).
 

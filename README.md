@@ -73,6 +73,38 @@ emailcleaner --delete --domains "mailchimp.com"
 
 > **Note:** `--delete` requires confirming a second prompt and uses a broader OAuth scope (`mail.google.com`). Prefer `--trash` (the default) unless you are certain.
 
+### Apply a label to matched emails
+
+Label all emails matching a query in one shot — no interactive sender selection needed. The label must already exist in your Gmail account.
+
+```bash
+emailcleaner --label "Internship / Job Hunting" --query "internship OR hiring OR job application"
+```
+
+Use `--dry-run` to preview the count before applying:
+
+```bash
+emailcleaner --label "Internship / Job Hunting" --query "internship OR hiring" --dry-run
+```
+
+If the label name isn't found, the tool prints all available label names so you can check the exact spelling.
+
+---
+
+## Multiple accounts
+
+EmailCleaner stores its auth token in `~/.emailcleaner/` by default. To use a different Gmail account, point `--token-dir` at a separate directory:
+
+```bash
+# Personal account (default)
+emailcleaner --dry-run
+
+# Second account — triggers its own OAuth flow on first use
+emailcleaner --token-dir ~/.emailcleaner/work/ --dry-run
+```
+
+Each directory holds an independent token, so you can switch between accounts without re-authenticating.
+
 ---
 
 ## All options
@@ -82,12 +114,15 @@ emailcleaner --delete --domains "mailchimp.com"
 | `--credentials` | `credentials.json` | Path to OAuth2 client secrets JSON |
 | `--token-dir` | `~/.emailcleaner/` | Directory to store the auth token |
 | `-q / --query` | *(all mail)* | Gmail search query |
+| `--label` | off | Apply a named Gmail label to all matched emails |
 | `--dry-run` | off | Scan and display only, no modifications |
 | `--delete` | off | Permanently delete instead of trashing |
 | `--min-count` | `2` | Only show senders with at least N emails |
 | `--sort` | `count` | Sort summary by `count` or `domain` |
 | `--limit` | `0` (unlimited) | Max messages to scan |
 | `--domains` | *(interactive)* | Comma-separated domains to clean |
+| `--include-receipts` | off | Include transactional emails in sender counts |
+| `--output` | off | Write results to a CSV file |
 
 ---
 
