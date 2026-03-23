@@ -23,13 +23,25 @@ Bulk-clean marketing emails from Gmail. Scans your inbox, groups senders by doma
    - Under **Test users**, add your own Gmail address
    - Save and continue through the remaining screens
 5. Back in Create Credentials, choose application type: **Desktop app**, then click **Create**
-6. Click **Download JSON** — save the file as `credentials.json` in the project root
+6. Click **Download JSON** — save the file as `credentials.json` in the directory you'll run `emailcleaner` from (or pass its path via `--credentials`)
 
 ### 2. Install
 
 ```bash
 cd /path/to/EmailCleaner
+
+# Create and activate a virtual environment (recommended)
+python3 -m venv .venv
+source .venv/bin/activate   # Linux / macOS
+# .venv\Scripts\activate    # Windows
+
 pip install -e .
+```
+
+This installs the `emailcleaner` command. You can also run it without installing via:
+
+```bash
+python -m emailcleaner
 ```
 
 ### 3. Authenticate
@@ -155,6 +167,7 @@ Each `--token-dir` holds an independent token, so you can switch between account
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--version` | | Print version and exit |
 | `--credentials` | `credentials.json` | Path to OAuth2 client secrets JSON |
 | `--token-dir` | `~/.emailcleaner/` | Directory to store the auth token |
 | `--whoami` | off | Print the email address for the current token and exit |

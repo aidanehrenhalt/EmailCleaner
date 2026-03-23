@@ -18,10 +18,9 @@ from emailcleaner.gmail import (
 )
 from emailcleaner.grouping import group_by_domain, is_transactional
 from emailcleaner.display import (
-    show_summary,
     write_csv,
     write_label_csv,
-    prompt_selection,
+    paginated_select,
     confirm_action,
     make_progress,
     console,
@@ -239,16 +238,16 @@ def main(argv: list[str] | None = None):
         console.print("\n[dim]Dry run — no changes made.[/dim]")
         sys.exit(0)
 
-    # Show terminal table for interactive domain selection
-    if not args.domains:
-        show_summary(groups, sort_by=args.sort)
-
     if not groups:
         sys.exit(0)
 
-    # --- Select and clean ---
+    action = "delete" if args.delete else "trash"
+    action_fn = batch_delete if args.delete else batch_trash
+    action_verb = "Deleting" if args.delete else "Trashing"
+    past_tense = "deleted" if args.delete else "trashed"
+
+    # --- Non-interactive mode: single pass ---
     if args.domains:
-        # Non-interactive mode
         target_domains = {d.strip().lower() for d in args.domains.split(",")}
         selected = [g for g in groups.values() if g.domain in target_domains]
         if not selected:
@@ -256,32 +255,59 @@ def main(argv: list[str] | None = None):
                 f"[yellow]None of the specified domains found: {args.domains}[/yellow]"
             )
             sys.exit(1)
-    else:
-        selected = prompt_selection(groups)
 
-    if not selected:
-        console.print("[dim]Nothing selected. Exiting.[/dim]")
+        if not confirm_action(selected, action=action):
+            console.print("[dim]Cancelled.[/dim]")
+            sys.exit(0)
+
+        all_ids = []
+        for g in selected:
+            all_ids.extend(g.message_ids)
+
+        with make_progress() as progress:
+            task = progress.add_task(f"{action_verb}...", total=len(all_ids))
+            processed = action_fn(service, all_ids)
+            progress.update(task, completed=processed)
+
+        console.print(
+            f"\n[bold green]Done! {processed} emails {past_tense}.[/bold green]"
+        )
         sys.exit(0)
 
-    action = "delete" if args.delete else "trash"
-    if not confirm_action(selected, action=action):
-        console.print("[dim]Cancelled.[/dim]")
-        sys.exit(0)
+    # --- Interactive loop: select, clean, repeat ---
+    while groups:
+        selected = paginated_select(groups, sort_by=args.sort)
+        if not selected:
+            console.print("[dim]Exiting.[/dim]")
+            sys.exit(0)
 
-    # --- Execute ---
-    all_ids = []
-    for g in selected:
-        all_ids.extend(g.message_ids)
+        if not confirm_action(selected, action=action):
+            console.print("[dim]Skipped.[/dim]")
+            continue
 
-    action_fn = batch_delete if args.delete else batch_trash
-    action_verb = "Deleting" if args.delete else "Trashing"
+        all_ids = []
+        for g in selected:
+            all_ids.extend(g.message_ids)
 
-    with make_progress() as progress:
-        task = progress.add_task(f"{action_verb}...", total=len(all_ids))
-        processed = action_fn(service, all_ids)
-        progress.update(task, completed=processed)
+        with make_progress() as progress:
+            task = progress.add_task(f"{action_verb}...", total=len(all_ids))
+            processed = action_fn(service, all_ids)
+            progress.update(task, completed=processed)
 
-    past_tense = "deleted" if args.delete else "trashed"
-    console.print(
-        f"\n[bold green]Done! {processed} emails {past_tense}.[/bold green]"
-    )
+        console.print(
+            f"\n[bold green]Done! {processed} emails {past_tense}.[/bold green]"
+        )
+
+        # Remove cleaned groups so the next iteration shows what's left
+        for g in selected:
+            groups.pop(g.domain, None)
+
+        if not groups:
+            console.print("\n[bold]All sender groups have been cleaned.[/bold]")
+            break
+
+        # Pause so the user can see the result before redisplaying
+        try:
+            input("\nPress Enter to continue...")
+        except (EOFError, KeyboardInterrupt):
+            sys.exit(0)
