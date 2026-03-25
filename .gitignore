@@ -6,6 +6,7 @@ build/
 .eggs/
 credentials.json
 token.json
+.emailcleaner/
 *.token
 .env
 .venv/

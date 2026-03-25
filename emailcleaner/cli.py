@@ -153,7 +153,8 @@ def main(argv: list[str] | None = None):
     if args.whoami:
         profile = service.users().getProfile(userId="me").execute()
         console.print(f"Signed in as: [bold cyan]{profile['emailAddress']}[/bold cyan]")
-        console.print(f"Token dir:    {args.token_dir or '~/.emailcleaner/'}")
+        from emailcleaner.auth import DEFAULT_TOKEN_DIR
+        console.print(f"Token dir:    {args.token_dir or DEFAULT_TOKEN_DIR}")
         sys.exit(0)
 
     # --- Scan messages ---

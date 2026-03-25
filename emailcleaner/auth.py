@@ -11,7 +11,7 @@ from googleapiclient.discovery import build
 SCOPES_MODIFY = ["https://www.googleapis.com/auth/gmail.modify"]
 SCOPES_FULL = ["https://mail.google.com/"]
 
-DEFAULT_TOKEN_DIR = Path.home() / ".emailcleaner"
+DEFAULT_TOKEN_DIR = Path(__file__).parent.parent / ".emailcleaner"
 
 
 def get_gmail_service(
@@ -30,17 +30,23 @@ def get_gmail_service(
     token_dir.mkdir(parents=True, exist_ok=True)
     token_path = token_dir / "token.json"
 
-    # Restrict token file permissions
     scopes = SCOPES_FULL if full_access else SCOPES_MODIFY
 
     creds = None
     if token_path.exists():
-        creds = Credentials.from_authorized_user_file(str(token_path), scopes)
+        try:
+            creds = Credentials.from_authorized_user_file(str(token_path), scopes)
+        except Exception:
+            creds = None
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except Exception:
+                creds = None
+
+        if not creds or not creds.valid:
             if not os.path.exists(credentials_path):
                 raise FileNotFoundError(
                     f"OAuth credentials file not found: {credentials_path}\n"
